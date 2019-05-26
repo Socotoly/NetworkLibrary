@@ -40,7 +40,7 @@ namespace UdpServer
 
         public byte[] Payload { get; }
 
-        public void Send(UdpClient Client, IPEndPoint RemoteIp)
+        public void Send(Client Client, IPEndPoint RemoteIp)
         {
             this.TimeStamp = TimestampNow();
             Console.WriteLine(TimeStamp);

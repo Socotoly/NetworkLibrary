@@ -24,7 +24,6 @@ namespace UdpServer
             
             var packet = new Packet(50845,Data,80,1000);
             Program.packet = packet;
-            Console.WriteLine(packet.Payload.Length);
 
             Udp("192.168.31.136", "197.215.152.148", 8696, packet.Payload);
 
@@ -33,7 +32,7 @@ namespace UdpServer
         private static void Udp(String clientIp, String serverIp, int serverPort, byte[] data)
         {
             var localEndPoint = new IPEndPoint(IPAddress.Parse(clientIp), port: 0);
-            var client = new UdpClient(localEndPoint);
+            var client = new Client(localEndPoint);
             Console.WriteLine("Client is ready");
 
             var server = new IPEndPoint(IPAddress.Parse(serverIp), serverPort);
