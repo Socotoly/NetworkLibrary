@@ -5,69 +5,71 @@ using System.Net.Sockets;
 using System.Text;
 using System.Linq;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace UdpServer
 {
-    class Packet
+    public class Packet
     {
-        public long TimeStamp = 0;
-        public int SequenceNumber;
-        public int RTT;
-        private byte[] SequenceNumberByte = new byte[4];
-        private byte[] RTTByte = new byte[4];
-        private byte[] TimeStampByte = new byte[8];
-        public byte[] Data;
-        public int Size;
-        public Stopwatch watch;
-
-        public Packet(int SequenceNumber, byte[] Data, int RTT, int size)
+        public enum Type : byte
         {
-            this.Data = Data;
-            this.SequenceNumber = SequenceNumber;
-            this.RTT = RTT;
-            this.Size = size;
+            KeepAlive=0,
+            Data=1,
+            ARQ=2,
+            Connect=3,
+            AcceptConnect=4
+        }
 
-            Payload = new byte[size];
-            //Console.WriteLine("empty packet" + Payload.Length);
-            SequenceNumberByte = BitConverter.GetBytes(SequenceNumber);
-            RTTByte = BitConverter.GetBytes(RTT);
-            TimeStampByte = BitConverter.GetBytes(TimeStamp);
+        public uint SequenceNumber;
+        public uint RTT;
+        private byte[] SequenceNumberByte = new byte[4];
+        private byte[] RTTByte = new byte[2];
+        private byte[] TypeByte = new byte[1];
+        public byte[] Data;
 
-            this.Payload = Combine(SequenceNumberByte, RTTByte, TimeStampByte, Data);
-            //Console.WriteLine("packet" + Payload.Length);
+        public Packet(Type Type, byte[] Data = null, uint RTT = 0, uint SequenceNumber = 0)
+        {
+            if(Type == Type.KeepAlive)
+            {
+                Payload = new byte[] { (byte)Type };
+            }
+            if (Type == Type.Data)
+            {
+                this.Data = Data;
+                this.SequenceNumber = SequenceNumber;
+                this.RTT = RTT;
+
+                SequenceNumberByte = BitConverter.GetBytes(SequenceNumber);
+                RTTByte = BitConverter.GetBytes(RTT);
+                TypeByte = BitConverter.GetBytes((byte)Type);
+
+                Payload = new byte[RTTByte.Length + SequenceNumberByte.Length + Data.Length + TypeByte.Length];
+                Console.WriteLine(Payload.Length);
+                this.Payload = Combine(TypeByte, SequenceNumberByte, RTTByte, Data);
+            }
+            if (Type == Type.ARQ)
+            {
+
+            }
+            if(Type == Type.Connect)
+            {
+                Payload = new byte[] { (byte)Type };
+            }
+            if (Type == Type.AcceptConnect)
+            {
+                Payload = new byte[] { (byte)Type };
+            }
+
 
         }
 
         public byte[] Payload { get; }
 
-        public void Send(Client Client, IPEndPoint RemoteIp)
-        {
-            this.TimeStamp = TimestampNow();
-            Console.WriteLine(TimeStamp);
-            TimeStampByte = BitConverter.GetBytes(TimeStamp);
-            Console.WriteLine(Payload.Length);
-            Console.WriteLine(TimeStampByte.Length);
-            int e = 0;
-            for (int i = 8; i < 16; i++)
-            {
-                Payload[i] = TimeStampByte[e];
-                //Console.WriteLine("i=" + i + " e=" + e);
-                e++;
-            }
-            watch = new Stopwatch();
-            watch.Start();
-            
-            Client.Send(this.Payload, Payload.Length, RemoteIp);
-        }
-
-        public long TimestampNow()
-        {
-            return (long) DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        }
+        public uint Size { get => (uint)Payload.Length; }
 
         private byte[] Combine(params byte[][] arrays)
         {
-            byte[] rv = new byte[this.Size];
+            byte[] rv = new byte[Size];
             int offset = 0;
             foreach (byte[] array in arrays)
             {

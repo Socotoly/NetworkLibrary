@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
+using UdpServer;
 
 namespace Server
 {
@@ -10,11 +12,14 @@ namespace Server
     {
         UdpClient listener;
         IPEndPoint groupEP;
+        int DataPackets = 0;
 
         public Server(int port)
         {
             listener = new UdpClient(port);
             //  groupEP = new IPEndPoint(IPAddress.Parse("127.0.0.1"), port);
+            Console.WriteLine("server is ready");
+            Console.WriteLine("Packets: " + DataPackets);
 
             StartListener(port);
         }
@@ -24,6 +29,14 @@ namespace Server
             listener.Close();
         }
 
+        public static void RewriteLine(int lineNumber, String newText)
+        {
+            int currentLineCursor = Console.CursorTop;
+            Console.SetCursorPosition(0, currentLineCursor - lineNumber);
+            Console.Write(newText); Console.WriteLine(new string(' ', Console.WindowWidth - newText.Length));
+            Console.SetCursorPosition(0, currentLineCursor);
+        }
+
         private void StartListener(int port)
         {
 
@@ -31,30 +44,36 @@ namespace Server
             {
                 while (true)
                 {
-                    Console.WriteLine("server is ready");
 
                     byte[] bytes = listener.Receive(ref groupEP);
 
-                    listener.Send(bytes, bytes.Length, groupEP);
-                    Console.WriteLine(bytes.Length);
+                    //Console.WriteLine(bytes);
+                    //Console.WriteLine(bytes[0]);
+                    //Console.WriteLine(groupEP.Address);
+                    //Console.WriteLine(groupEP.Port);
 
-                    byte[] timeByte = new byte[8];
-                    int e = 0;
-                    for (int i = 8; i < 16; i++)
+                    if(bytes[0] == 0)
                     {
-                        timeByte[e] = bytes[i];
-                        Console.WriteLine(i);
-                        e++;
+                        var packet = new Packet(Packet.Type.KeepAlive);
+
+                        listener.Send(packet.Payload, packet.Payload.Length, groupEP);
+                    }
+                    if (bytes[0] == 3)
+                    {
+                        var packet = new Packet(Packet.Type.AcceptConnect);
+
+                        listener.Send(packet.Payload, packet.Payload.Length,groupEP);
+
+                        Thread.Sleep(5);
+
+                        listener.Send(packet.Payload, packet.Payload.Length, groupEP);
+                    }
+                    if (bytes[0] == 1)
+                    {
+                        DataPackets++;
+                        RewriteLine(2, "Packets: " + DataPackets);
                     }
 
-                    var timestamp = BitConverter.ToInt64(timeByte);
-                    var localtime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-                    var diff = localtime - timestamp;
-                   
-
-                    Console.WriteLine($"Received broadcast from {groupEP} :");
-                    Console.WriteLine(timestamp + "   " + localtime);
-                    Console.WriteLine("diff="+diff);
                 }
             }
             catch (SocketException e)
