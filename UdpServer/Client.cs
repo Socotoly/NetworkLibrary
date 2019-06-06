@@ -14,11 +14,15 @@ namespace UdpServer
         public uint RTT = 0;
         private Stopwatch RTTWatcher = new Stopwatch();
         private Stopwatch KeepAliveTimeoutWatcher = new Stopwatch();
-        public const int SIO_UDP_CONNRESET = -1744830452;
-        private Task ReceiveTask;
-        public Timer ConnectAttempt;
-        private bool isBusy = false;
-
+        private const int SIO_UDP_CONNRESET = -1744830452;
+        private Thread ReceiveThread;
+        private Thread ConnectThread;
+        private Thread KeepAliveThread;
+        private ushort RemoteRate;
+        private uint sleepAfterSend = 2;
+        private Queue<Packet> Buffer = new Queue<Packet>();
+        private Thread SendThread;
+        private SortedList<uint, Packet> SentPackets = new SortedList<uint, Packet>();
 
         public Client(IPEndPoint localEP) : base(localEP)
         {
@@ -29,7 +33,7 @@ namespace UdpServer
                 );
         }
 
-        private async Task BeginReceiveCycle()
+        private async void BeginReceiveCycle()
         {
             while(true)
             {
@@ -39,19 +43,27 @@ namespace UdpServer
 
                     if (task.RemoteEndPoint.Address.ToString() == ServerEP.Address.ToString())
                     {
-                        var type = task.Buffer[0].ToString();
+                        var Buffer = task.Buffer;
+                        var type = (Packet.Type)Buffer[0];
 
-                        if (type == "0")
+                        switch (type)
                         {
-                            ProcessKeepAlive(task.Buffer);
-
-                           // Console.WriteLine(RTT);
-                        }
-                        if (type == "4")
-                        {
-                            Connected = true;
-
-                            KeepAliveTimeoutWatcher.Restart();
+                            case Packet.Type.KeepAlive:
+                                ProcessKeepAlive(Buffer);
+                                break;
+                            case Packet.Type.Data:
+                                break;
+                            case Packet.Type.ARQ:
+                                ProcessARQ(Buffer);
+                                break;
+                            case Packet.Type.Connect:
+                                break;
+                            case Packet.Type.AcceptConnect:
+                                Connected = true;
+                                KeepAliveTimeoutWatcher.Restart();
+                                break;
+                            case Packet.Type.Rate:
+                                break;
                         }
                     }
                 }
@@ -63,6 +75,14 @@ namespace UdpServer
             }
         }
 
+        private async void ProcessARQ(byte[] buffer)
+        {
+            var ARQPacket = await Packet.Serialize(buffer);
+            var PacketToSend = SentPackets.GetValueOrDefault(ARQPacket.SequenceNumber);
+
+            Send(PacketToSend);
+        }
+
         private void ProcessKeepAlive(byte[] packet)
         {
             KeepAliveTimeoutWatcher.Restart();
@@ -72,23 +92,23 @@ namespace UdpServer
             RTTWatcher.Reset();
         }
         
-        public async void KeepAliveAsync(Object state)
+        public void KeepAliveAsync()
         {
             while (true)
             {
                 if (Connected && (uint)KeepAliveTimeoutWatcher.ElapsedMilliseconds >= (uint)KeepAliveTimeout)
                 {
-                Console.WriteLine((uint)KeepAliveTimeoutWatcher.ElapsedMilliseconds);
-                Console.WriteLine((uint)KeepAliveTimeout);
-                Connected = false;
+                    Connected = false;
+
+                    //SendThread.Abort();
                 }
                 if (Connected)
                 {
-                var packet = new Packet(Packet.Type.KeepAlive);
+                    var packet = new Packet(Packet.Type.KeepAlive);
 
-                RTTWatcher.Start();
-                //Console.WriteLine("Sending KeepAlive");
-                Send(packet);
+                    RTTWatcher.Start();
+                    //Console.WriteLine("Sending KeepAlive");
+                    Send(packet);
                 }
 
                 Thread.Sleep(1500);
@@ -101,9 +121,26 @@ namespace UdpServer
         {
             ServerEP = ServerIP;
 
-            ReceiveTask = Task.Run(()=>BeginReceiveCycle());
 
-            Task.Run(() => ConnectAttempt = new Timer(TryToConnect, null, 0, KeepAliveTimeout));
+            //ConnectTask = Task.Run(()=> TryToConnect());
+
+            SendThread = new Thread(TryToSend);
+            SendThread.Start();
+
+            ConnectThread = new Thread(TryToConnect);
+            ConnectThread.Start();
+
+            //ConnectTask = Task.Run(() => TryToConnect(null));
+
+            ReceiveThread = new Thread(BeginReceiveCycle);
+            ReceiveThread.Start();
+
+            KeepAliveThread = new Thread(KeepAliveAsync);
+            KeepAliveThread.Start();
+
+            //new Thread(AdjustPacketRate).Start();
+
+            //KeepAliveTask = Task.Run(()=> KeepAliveAsync());
 
             //var status = TryToConnect();
 
@@ -118,44 +155,50 @@ namespace UdpServer
             {
                 Connected = false;
 
-                ReceiveTask.Dispose();
+                ReceiveThread.Abort();
 
-                ConnectAttempt.Dispose();
+                //ConnectTask.Dispose();
             }
         }
 
-        private void TryToConnect(Object state)
+        private void TryToConnect(object state)
         {
-            if (!Connected)
-            {
-                Console.WriteLine("Trying to Connect");
+            while (true) {
 
-                Send(new Packet(Packet.Type.Connect));
-
-                Thread.Sleep(5);
-
-                //Send(new Packet(Packet.Type.Connect));
-
-                //var status = ProcessAcceptConnect();
-                //Thread.Sleep(5);
-
-                if (Connected)
+                if (!Connected)
                 {
-                    Console.WriteLine("Connected");
+                    Console.WriteLine("Trying to Connect");
 
-                    Connected = true;
+                    Send(new Packet(Packet.Type.Connect));
 
-                    KeepAliveTimeoutWatcher.Start();
+                    Thread.Sleep(5);
 
-                    KeepAliveAsync(null);
+                    //Send(new Packet(Packet.Type.Connect));
+
+                    var status = ProcessAcceptConnect();
+                    //Thread.Sleep(5);
+
+                    if (status)
+                    {
+                        Console.WriteLine("Connected");
+
+                        Connected = true;
+
+                        KeepAliveTimeoutWatcher.Start();
+
+                        //Task.Run(() => KeepAliveTask = KeepAliveAsync());
+                    }
+                    else
+                    {
+                        //ReceiveTask.Dispose();
+                        Console.WriteLine("No response");
+
+                        Connected = false;
+                    }
                 }
-                else
-                {
-                    //ReceiveTask.Dispose();
-                    Console.WriteLine("No response");
 
-                    Connected = false;
-                }
+                Thread.Sleep(2500);
+
             }
         }
 
@@ -200,7 +243,20 @@ namespace UdpServer
         }
 
         public bool Connected { get; private set; }
+        public uint Rate { get => 1000 / SleepAfterSend; }
 
+        public uint SleepAfterSend
+        {
+            get
+            {
+                return sleepAfterSend;
+            }
+            private set
+            {
+
+                sleepAfterSend = 1000 / value;
+            }
+        }
         public int KeepAliveInterval { get; set; } = 1500;
 
         public int KeepAliveTimeout { get; set; } = 5000;
@@ -209,7 +265,44 @@ namespace UdpServer
 
         public void Send(Packet Packet)
         {
-            base.Send(Packet.Payload, Packet.Payload.Length, ServerEP);
+            Buffer.Enqueue(Packet);
+        }
+
+        private void TryToSend()
+        {
+            while (true)
+            {
+                if(Buffer.Count > 0 && Connected)
+                {
+                    var Packet = Buffer.Dequeue();
+
+                    base.Send(Packet.Payload, Packet.Payload.Length, ServerEP);
+
+                    if (Packet.GetType == Packet.Type.Data)
+                    {
+                        SentPackets.Add(Packet.SequenceNumber, Packet);
+                    }
+                }
+            }
+        }
+
+        private void AdjustPacketRate()
+        {
+            while (true)
+            {
+                if (Connected && Rate > 0)
+                {
+                    Thread.Sleep(3000);
+
+                    var rate = Rate;
+                    Console.WriteLine("Prev Rate:" + Rate);
+                    rate = (uint)(rate + (rate * 0.1));
+
+                    SleepAfterSend = rate;
+                    Console.WriteLine("New Rate:" + Rate);
+
+                }
+            }
         }
 
         private static void NOP(double durationSeconds)
