@@ -1,13 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Linq;
-using System.Diagnostics;
-using System.Reflection;
 using System.Threading.Tasks;
-using System.Runtime.Serialization;
 
 namespace UdpServer
 {
@@ -18,76 +10,87 @@ namespace UdpServer
         {
             KeepAlive=0,
             Data=1,
-            ARQ=2,
+            ARQRequest=2,
             Connect=3,
             AcceptConnect=4,
-            Rate=5
+            Rate=5,
+            ARQResponse=6
         }
 
         public uint SequenceNumber;
         public uint RTT;
+        public byte[] Data;
+        public new Type GetType;
+        public int ClientID;
+        public int InterfaceID;
         private byte[] SequenceNumberByte = new byte[4];
         private byte[] RTTByte = new byte[2];
         private byte[] TypeByte = new byte[1];
         private byte[] RateByte = new byte[2];
-        public byte[] Data;
-        public new Type GetType;
+        private byte[] ClientIDByte = new byte[4];
+        private byte[] InterfaceIDByte = new byte[4];
+        
 
-        public Packet(Type Type, byte[] Data = null, uint RTT = 0, uint SequenceNumber = 0)
+        public Packet(Type Type, int ClientID, int InterfaceID, byte[] Data = null, uint RTT = 0, uint SequenceNumber = 0)
         {
+            GetType = Type;
+            this.ClientID = ClientID;
+            this.InterfaceID = InterfaceID;
+
+            TypeByte = BitConverter.GetBytes((byte)Type);
+            ClientIDByte = BitConverter.GetBytes(ClientID);
+            InterfaceIDByte = BitConverter.GetBytes(InterfaceID);
+
+            this.Data = Data;
+            this.SequenceNumber = SequenceNumber;
+            this.RTT = RTT;
+
+            SequenceNumberByte = BitConverter.GetBytes(SequenceNumber);
+            RTTByte = BitConverter.GetBytes(RTT);
+
             switch (Type)
             {
                 case Type.KeepAlive:
-                    Payload = new byte[] { (byte)Type };
+                    {
+                        Payload = new byte[] { (byte)Type };
+                    }
                     break;
                 case Type.Data:
+                    {
+                        Payload = new byte[TypeByte.Length + ClientIDByte.Length + InterfaceIDByte.Length + RTTByte.Length + SequenceNumberByte.Length + Data.Length];
+                        Payload = Combine(TypeByte, ClientIDByte, InterfaceIDByte, SequenceNumberByte, RTTByte, Data);
+                    }
                     break;
-                case Type.ARQ:
-                    this.SequenceNumber = SequenceNumber;
-                    TypeByte = BitConverter.GetBytes((byte)Type);
-                    SequenceNumberByte = BitConverter.GetBytes(SequenceNumber);
-                    Payload = new byte[TypeByte.Length + SequenceNumberByte.Length];
-                    Payload = Combine(TypeByte, SequenceNumberByte);
+                case Type.ARQRequest:
+                    {
+                        Payload = new byte[TypeByte.Length + ClientIDByte.Length + InterfaceIDByte.Length + SequenceNumberByte.Length];
+                        Payload = Combine(TypeByte, ClientIDByte, InterfaceIDByte, SequenceNumberByte);
+                    }
                     break;
                 case Type.Connect:
-                    Payload = new byte[] { (byte)Type };
+                    {
+                        Payload = new byte[10];
+                        Payload = Combine(TypeByte, ClientIDByte, InterfaceIDByte);
+                    }
                     break;
                 case Type.AcceptConnect:
-                    Payload = new byte[] { (byte)Type };
+                    {
+                        Payload = new byte[] { (byte)Type };
+                    }
                     break;
                 case Type.Rate:
+                    {
+                        Payload = new byte[4];
+                        Payload = Combine(TypeByte, Data);
+                    }
+                    break;
+                case Type.ARQResponse:
+                    {
+                        Payload = new byte[RTTByte.Length + SequenceNumberByte.Length + Data.Length + TypeByte.Length];
+                        Payload = Combine(TypeByte, ClientIDByte,InterfaceIDByte, SequenceNumberByte, RTTByte, Data);
+                    }
                     break;
             }
-
-           
-            if (Type == Type.Data)
-            {
-                this.Data = Data;
-                this.SequenceNumber = SequenceNumber;
-                this.RTT = RTT;
-                GetType = Type;
-
-                SequenceNumberByte = BitConverter.GetBytes(SequenceNumber);
-                RTTByte = BitConverter.GetBytes(RTT);
-                TypeByte = BitConverter.GetBytes((byte)Type);
-
-                Payload = new byte[RTTByte.Length + SequenceNumberByte.Length + Data.Length + TypeByte.Length];
-                //Console.WriteLine(Payload.Length);
-                this.Payload = Combine(TypeByte, SequenceNumberByte, RTTByte, Data);
-            }
-            
-           
-            if (Type == Type.Rate)
-            {
-                TypeByte = new byte[] { (byte)Type };
-
-                Payload = new byte[4];
-
-                Payload = Combine(TypeByte, Data);
-                //Payload = new byte[] { (byte)Type + Data };
-            }
-
-
         }
 
         public byte[] Payload { get; }
@@ -106,42 +109,61 @@ namespace UdpServer
             return rv;
         }
 
-        public async static Task<Packet> Serialize(byte[] data)
+        public async static Task<Packet> Serialize(byte[] Payload)
         {
-            var type = (Type) data[0];
+            var type = (Type) Payload[0];
+            var clientId = BitConverter.ToInt32(new byte[4] { Payload[2], Payload[3], Payload[4], Payload[5] });
+            var interfaceId = BitConverter.ToInt32(new byte[4] { Payload[6], Payload[7], Payload[8], Payload[9] });
 
             switch (type)
             {
                 case Type.KeepAlive:
-                    return new Packet(type);
+                    return new Packet(type, clientId, interfaceId);
                 case Type.Data:
-                    var seq = BitConverter.ToUInt32( new byte[4] { data[2], data[3], data[4], data[5] });
-                    //var seq = (uint) (data[1] + data[2] + data[3] + data[4]);
-                    var rtt = BitConverter.ToUInt16(new byte[2] { data[6], data[7] });
-                    var Data = new byte[data.Length - 4 - 2 - 2];
-
-                    //Console.WriteLine("Size is: /" + Data.Length + "/");
-
-                    int c = 8;
-                    for(int i = 0; i < Data.Length; i++)
                     {
-                        Data[i] = data[c];
-                        c++;
+                        var seq = BitConverter.ToUInt32(new byte[4] { Payload[10], Payload[11], Payload[12], Payload[13] });
+                        var rtt = BitConverter.ToUInt16(new byte[2] { Payload[14], Payload[15] });
+                        var Data = new byte[Payload.Length - 4 - 2 - 2 - 4 - 4];
+
+                        int c = 16;
+                        for (int i = 0; i < Data.Length; i++)
+                        {
+                            Data[i] = Payload[c];
+                            c++;
+                        }
+                        return new Packet(type, clientId, interfaceId, Data, rtt, seq);
                     }
+                case Type.ARQRequest:
+                    {
+                        var seq = BitConverter.ToUInt32(new byte[4] { Payload[10], Payload[11], Payload[12], Payload[13] });
 
-                    return new Packet(type, Data, rtt, seq);
-                case Type.ARQ:
-                    var se = BitConverter.ToUInt32(new byte[4] { data[2], data[3], data[4], data[5] });
-
-                    return new Packet(type, null, 0, se);
+                        return new Packet(type, clientId, interfaceId, null, 0, seq);
+                    }
                 case Type.Connect:
-                    return new Packet(type);
+                    {
+                        return new Packet(type, clientId, interfaceId);
+                    }
                 case Type.AcceptConnect:
-                    return new Packet(type);
+                    return new Packet(type, clientId, interfaceId);
                 case Type.Rate:
-                    return new Packet(type);
+                    return new Packet(type, clientId, interfaceId);
+                case Type.ARQResponse:
+                    {
+                        var seq = BitConverter.ToUInt32(new byte[4] { Payload[10], Payload[11], Payload[12], Payload[13] });
+                        var rtt = BitConverter.ToUInt16(new byte[2] { Payload[14], Payload[15] });
+                        var Data = new byte[Payload.Length - 4 - 2 - 2 - 4 - 4];
+
+                        int c = 16;
+                        for (int i = 0; i < Data.Length; i++)
+                        {
+                            Data[i] = Payload[c];
+                            c++;
+                        }
+
+                        return new Packet(type, clientId, interfaceId, Data, rtt, seq);
+                    }
                 default:
-                    return new Packet(type);
+                    return new Packet(type, clientId, interfaceId);
             }
         }
     }

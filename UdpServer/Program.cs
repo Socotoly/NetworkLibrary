@@ -4,7 +4,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace UdpServer
 {
@@ -12,18 +11,12 @@ namespace UdpServer
     {
         public static Packet packet;
         public static IPEndPoint groupEP;
-        public static bool rec = true;
-        public static int i = 0;
-        public static byte[] e = new byte[510];
-
 
         static void Main(string[] args)
         {
+            new NetworkManager();
 
-            
-
-            Udp("192.168.31.136", "192.168.31.136", 8696);
-
+            //Udp("192.168.10.52", "192.168.10.52", 8696);
         }
 
         private static void Udp(String clientIp, String serverIp, int serverPort)
@@ -52,24 +45,20 @@ namespace UdpServer
             var Data = Encoding.ASCII.GetBytes(sentence);
             //Console.WriteLine(Data.Length);
 
-            for (int i = 1; i < 10000; i++)
+            for (int i = 1; i < 1000; i++)
             {
-                Program.packet = new Packet(Packet.Type.Data, Data, 80, (uint)i);
+                Program.packet = new Packet(Packet.Type.Data,1,1, Data, client.RTT, (uint)i);
 
                 client.Send(packet);
-                
+
                 Thread.Sleep(2);
-                
             }
 
             w.Stop();
 
             Console.WriteLine("toke " + w.Elapsed);
 
-
-            Thread.Sleep(10000);
             Console.ReadLine();
-
         }
 
         private static void NOP(double durationSeconds)
@@ -100,6 +89,5 @@ namespace UdpServer
 
             Console.ReadLine();
         }
-
     }
 }
