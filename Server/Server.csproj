@@ -4,11 +4,10 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.2</TargetFramework>
   </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\UdpServer\UdpServer.csproj" />
-  </ItemGroup>
 <PropertyGroup>
   <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
 </PropertyGroup>
+<ItemGroup>
+  <ProjectReference Include="..\PacketFactory\PacketFactory.csproj" />
+</ItemGroup>
 </Project>

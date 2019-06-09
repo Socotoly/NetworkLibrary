@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace UdpServer
+namespace PacketFactory
 {
     [Serializable]
     public class Packet

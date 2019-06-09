@@ -4,8 +4,9 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using PacketFactory;
 
-namespace UdpServer
+namespace Client
 {
     class Program
     {

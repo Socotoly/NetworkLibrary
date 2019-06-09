@@ -1,13 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28306.52
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29001.49
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UdpServer", "UdpServer\UdpServer.csproj", "{0A29EC4F-D237-4465-8421-31AC35C0162D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Client", "UdpServer\Client.csproj", "{0A29EC4F-D237-4465-8421-31AC35C0162D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server", "Server\Server.csproj", "{55C0AD98-6E7F-4CCC-9FBC-AE9E3EAB623A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Server", "Server\Server.csproj", "{55C0AD98-6E7F-4CCC-9FBC-AE9E3EAB623A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TcpServer", "TcpServer\TcpServer.csproj", "{E7EDAD1A-7D17-48E4-8309-EB57F1DE2E2F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TcpServer", "TcpServer\TcpServer.csproj", "{E7EDAD1A-7D17-48E4-8309-EB57F1DE2E2F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PacketFactory", "PacketFactory\PacketFactory.csproj", "{9EBA4144-44FA-4D73-9A59-5B4E06A4A3A2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,6 +29,10 @@ Global
 		{E7EDAD1A-7D17-48E4-8309-EB57F1DE2E2F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E7EDAD1A-7D17-48E4-8309-EB57F1DE2E2F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E7EDAD1A-7D17-48E4-8309-EB57F1DE2E2F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9EBA4144-44FA-4D73-9A59-5B4E06A4A3A2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9EBA4144-44FA-4D73-9A59-5B4E06A4A3A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9EBA4144-44FA-4D73-9A59-5B4E06A4A3A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9EBA4144-44FA-4D73-9A59-5B4E06A4A3A2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
