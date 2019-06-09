@@ -17,13 +17,14 @@ namespace Client
         {
             new NetworkManager();
 
+            Console.ReadLine();
             //Udp("192.168.10.52", "192.168.10.52", 8696);
         }
 
         private static void Udp(String clientIp, String serverIp, int serverPort)
         {
             var localEndPoint = new IPEndPoint(IPAddress.Parse(clientIp), port: 10001);
-            var client = new Client(localEndPoint);
+            var client = new Client(localEndPoint,1);
             Console.WriteLine("Client is ready");
 
             var server = new IPEndPoint(IPAddress.Parse(serverIp), serverPort);

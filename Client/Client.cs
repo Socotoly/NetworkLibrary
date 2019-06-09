@@ -10,6 +10,7 @@ namespace Client
 {
     class Client : UdpClient
     {
+        private int ID;
         public uint RTT = 0;
         private Stopwatch RTTWatcher = new Stopwatch();
         private Stopwatch KeepAliveTimeoutWatcher = new Stopwatch();
@@ -23,13 +24,15 @@ namespace Client
         private Thread SendThread;
         private SortedList<uint, Packet> SentPackets = new SortedList<uint, Packet>();
 
-        public Client(IPEndPoint localEP) : base(localEP)
+        public Client(IPEndPoint localEP, int ID) : base(localEP)
         {
             this.Client.IOControl(
                 (IOControlCode)SIO_UDP_CONNRESET,
                 new byte[] { 0, 0, 0, 0 },
                 null
                 );
+
+            this.ID = ID;
         }
 
         private async void BeginReceiveCycle()
