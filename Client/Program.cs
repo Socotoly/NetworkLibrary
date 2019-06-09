@@ -15,7 +15,12 @@ namespace Client
 
         static void Main(string[] args)
         {
-            new NetworkManager();
+            var net = new NetworkManager();
+
+            var sentence = new string("sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw");
+            var Data = Encoding.ASCII.GetBytes(sentence);
+
+            net.Send();
 
             Console.ReadLine();
             //Udp("192.168.10.52", "192.168.10.52", 8696);

@@ -39,6 +39,16 @@ namespace Client
             client.Send(packet);
         }
 
+        public void Connect(string ServerIP, int ServerPort)
+        {
+            var ServerEP = new IPEndPoint(IPAddress.Parse(ServerIP), ServerPort);
+
+            foreach (Client client in Clients.Values)
+            {
+                client.Connect(ServerEP);
+            }
+        }
+
         private Packet GetPacket(byte[] data, Client client)
         {
             return new Packet(Packet.Type.Data, client.ID, client.InterfaceID, data, 0, SequenceNumber);
