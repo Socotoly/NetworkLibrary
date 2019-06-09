@@ -24,7 +24,7 @@ namespace Client
         private static void Udp(String clientIp, String serverIp, int serverPort)
         {
             var localEndPoint = new IPEndPoint(IPAddress.Parse(clientIp), port: 10001);
-            var client = new Client(localEndPoint,1);
+            var client = new Client(localEndPoint,1,1);
             Console.WriteLine("Client is ready");
 
             var server = new IPEndPoint(IPAddress.Parse(serverIp), serverPort);

@@ -1,8 +1,11 @@
-﻿using System;
+﻿using PacketFactory;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Text;
+using System.Threading;
 
 namespace Client
 {
@@ -11,7 +14,10 @@ namespace Client
         public SortedList<int, IPEndPoint> Interfaces = new SortedList<int, IPEndPoint>();
         public SortedList<int, Client> Clients = new SortedList<int, Client>();
         public SortedList<int, int> Wheight = new SortedList<int, int>();
+        private List<int> NextClient = new List<int>();
         private int ClientID;
+        private int index = 0;
+        private uint SequenceNumber = 0;
 
         public NetworkManager()
         {
@@ -26,9 +32,16 @@ namespace Client
 
         public void Send(byte[] Data)
         {
+            SequenceNumber++;
+            var client = GetNextClient();
+            var packet = GetPacket(Data, client);
 
+            client.Send(packet);
+        }
 
-
+        private Packet GetPacket(byte[] data, Client client)
+        {
+            return new Packet(Packet.Type.Data, client.ID, client.InterfaceID, data, 0, SequenceNumber);
         }
 
         private void GetUsableInterfaces(NetworkInterface[] adapters)
@@ -78,17 +91,44 @@ namespace Client
 
             foreach (KeyValuePair<int, IPEndPoint> Interface in Interfaces)
             {
-                var client = new Client(Interface.Value, ClientID);
+                var client = new Client(Interface.Value, ClientID, Interface.Key);
 
                 Clients.Add(Interface.Key, client);
             }
 
             var w = 10 / Clients.Count;
+            //var wh = new SortedList<int, int>();
 
             foreach (KeyValuePair<int, Client> client in Clients)
             {
                 Wheight.Add(client.Key, w);
+                //wh.Add(client.Key, w);
             }
+
+            foreach (KeyValuePair<int, int> whe in Wheight )
+            {
+                var c = whe.Value;
+                for(int i = 0; i < c; i++)
+                {
+                    NextClient.Add(whe.Key);
+                }
+            }
+
+            NextClient.Shuffle();
+        }
+
+        private Client GetNextClient()
+        {
+            if(index == NextClient.Count - 1)
+            {
+                index = 0;
+            }
+            else
+            {
+                index++;
+            }
+
+            return Clients[NextClient[index]];
         }
 
         private void PrintInfo()
@@ -105,6 +145,45 @@ namespace Client
             {
                 Console.WriteLine(Interface.Key + " " + Interface.Value);
             }
+            foreach (int n in NextClient)
+            {
+                var c = GetNextClient();
+
+                Console.WriteLine("Next client is: "+c.Client.LocalEndPoint.ToString());
+            }
+            Console.WriteLine("-------------------------------");
+
+            foreach (int n in NextClient)
+            {
+                Console.WriteLine("Next client is: " + n);
+            }
         }
+    }
+
+    static class ShuffleListExtension
+    {
+        public static class ThreadSafeRandom
+        {
+            [ThreadStatic] private static Random Local;
+
+            public static Random ThisThreadsRandom
+            {
+                get { return Local ?? (Local = new Random(unchecked(Environment.TickCount * 31 + Thread.CurrentThread.ManagedThreadId))); }
+            }
+        }
+
+        public static void Shuffle<T>(this IList<T> list)
+        {
+            int n = list.Count;
+            while (n > 1)
+            {
+                n--;
+                int k = ThreadSafeRandom.ThisThreadsRandom.Next(n + 1);
+                T value = list[k];
+                list[k] = list[n];
+                list[n] = value;
+            }
+        }
+
     }
 }
