@@ -20,6 +20,7 @@ namespace Client
         private uint SequenceNumber = 0;
         private const int WheightVal = 10;
         public bool Connected = false;
+        public IPEndPoint ServerEP;
 
         public NetworkManager()
         {
@@ -33,7 +34,9 @@ namespace Client
         public void Send(byte[] Data)
         {
             SequenceNumber++;
+
             var client = GetNextClient();
+
             var packet = GetPacket(Data, client);
 
             client.Send(packet);
@@ -41,7 +44,7 @@ namespace Client
 
         public void Connect(string ServerIP, int ServerPort)
         {
-            var ServerEP = new IPEndPoint(IPAddress.Parse(ServerIP), ServerPort);
+            ServerEP = new IPEndPoint(IPAddress.Parse(ServerIP), ServerPort);
 
             foreach (Client client in Clients.Values)
             {
@@ -51,7 +54,7 @@ namespace Client
 
         private Packet GetPacket(byte[] data, Client client)
         {
-            return new Packet(Packet.Type.Data, client.ID, client.InterfaceID, data, 0, SequenceNumber);
+            return new Packet(Packet.Type.Data, client.ID, client.InterfaceID,Packet.Key, data, 0, SequenceNumber);
         }
 
         private void GetUsableInterfaces()
@@ -121,8 +124,7 @@ namespace Client
             {
                 index++;
             }
-            Console.WriteLine(index);
-            Console.WriteLine(NextClient.Count);
+
             return Clients[NextClient[index]];
         }
 
@@ -137,7 +139,8 @@ namespace Client
             else if (wc == 1)
             {
                 Wheight.Add(InterfaceID, WheightVal / 2);
-                Wheight.Values[0] = WheightVal / 2;
+                var key = Wheight.Keys[0];
+                Wheight[key] = WheightVal / 2;
             }
             else
             {
@@ -147,7 +150,9 @@ namespace Client
 
                 for(int i = 0; i < wc; i++)
                 {
-                    Wheight.Values[i] = Wheight.Values[i] / WheightVal * (WheightVal - val);
+                    var key = Wheight.Keys[i];
+
+                    Wheight[key] = Wheight[key] / WheightVal * (WheightVal - val);
                 }
             }
 
@@ -193,7 +198,8 @@ namespace Client
 
                     for (int i = 0; i < wc; i++)
                     {
-                        Wheight.Values[i] = ((Wheight.Values[i] / (TotalWheight) * 100) / 100) * 10;
+                        var key = Wheight.Keys[i];
+                        Wheight[key] = ((Wheight[key] / (TotalWheight) * 100) / 100) * 10;
                     }
 
                     for (int i = 0; i < wc; i++)
@@ -210,6 +216,7 @@ namespace Client
                 }
             }
         }
+
         private void PrintInfo()
         {
             foreach (KeyValuePair<int, IPEndPoint> Interface in Interfaces)

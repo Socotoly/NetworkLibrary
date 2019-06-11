@@ -17,7 +17,7 @@ namespace Client
         {
             var net = new NetworkManager();
 
-            net.Connect("192.168.10.52", 8696);
+            net.Connect("197.215.152.148", 8696);
 
             var sentence = new string("sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw sawefwewffffffffffffffffffffffffffffffffffffffffffffffffffffffffw");
             var Data = Encoding.ASCII.GetBytes(sentence);
@@ -27,14 +27,19 @@ namespace Client
 
             }
 
-            for (int i = 1; i < 1000; i++)
+            var w = new Stopwatch();
+            w.Start();
+            for (int i = 1; i < 6500; i++)
             {
                 net.Send(Data);
 
                 Thread.Sleep(2);
             }
+            w.Stop();
             //net.Send();
-
+            Console.WriteLine("Sent");
+            Console.WriteLine(w.ElapsedMilliseconds);
+            Console.WriteLine(Data.Length);
             Console.ReadLine();
             //Udp("192.168.10.52", "192.168.10.52", 8696);
         }
@@ -67,7 +72,7 @@ namespace Client
 
             for (int i = 1; i < 1000; i++)
             {
-                Program.packet = new Packet(Packet.Type.Data,1,1, Data, client.RTT, (uint)i);
+                Program.packet = new Packet(Packet.Type.Data,1,1,Packet.Key, Data, client.RTT, (uint)i);
 
                 client.Send(packet);
 

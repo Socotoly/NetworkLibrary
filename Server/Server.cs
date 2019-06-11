@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 
 namespace Server
@@ -26,6 +27,8 @@ namespace Server
         private List<uint> LostPackets = new List<uint>();
         private Queue<byte[]> ProccessBuffer = new Queue<byte[]>();
         private SortedList<int, SortedList<int, IPEndPoint>> Clients = new SortedList<int, SortedList<int, IPEndPoint>>();
+        private int lost = 0;
+
         public Server(int port)
         {
             listener = new UdpClient(port);
@@ -38,7 +41,15 @@ namespace Server
 
 
 
-            //Thread.Sleep(20000);
+            while(Buffer.Count == 0)
+            {
+
+            }
+            Thread.Sleep(20000);
+
+            Console.WriteLine("Lost packets: "+ lost);
+            Console.WriteLine("Total packets: "+ Buffer.Count);
+
 
             Console.ReadLine();
             //StartListener(port);
@@ -57,7 +68,7 @@ namespace Server
                 //{
                     //LostPackets.Sort();
                     
-                    var packet = new Packet(Packet.Type.ARQRequest, id, interfaceid, null, 0, LostPackets[0]);
+                    var packet = new Packet(Packet.Type.ARQRequest, id, interfaceid, Packet.Key, null, 0, LostPackets[0]);
 
                     if (! groupEP.Equals(null))
                     {
@@ -91,7 +102,7 @@ namespace Server
 
                         var data = new byte[] { 1, RateByte[0], RateByte[1] };
 
-                        var packet = new Packet(Packet.Type.Rate, id, interfaceid, data);
+                        var packet = new Packet(Packet.Type.Rate, id, interfaceid,Packet.Key, data);
 
                         listener.Send(packet.Payload, packet.Payload.Length, groupEP);
 
@@ -108,6 +119,13 @@ namespace Server
                 while (true)
                 {
                     byte[] bytes = listener.Receive(ref groupEP);
+
+                    //var passkey = bytes[];
+
+                    if (! Authenticated(bytes))
+                    {
+                        continue;
+                    }
 
                     var type = (Packet.Type)bytes[0];
 
@@ -171,39 +189,59 @@ namespace Server
             }
         }
 
+        private bool Authenticated(byte[] bytes)
+        {
+            if(bytes.Length >= 26)
+            {
+                var key = Encoding.Unicode.GetString(new byte[16] { bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15], bytes[16], bytes[17], bytes[18], bytes[19], bytes[20], bytes[21], bytes[22], bytes[23], bytes[24], bytes[25] });
+
+                return key.Equals(Packet.Key);
+            }
+            else
+            {
+                return false;
+            }
+        }
+
         private async void ProccessConnectPacket(byte[] data, IPEndPoint clientEP)
         {
             var packet = await Packet.Serialize(data);
 
-            var id = packet.ClientID;
+            var clientid = packet.ClientID;
+            var interfaceid = packet.InterfaceID;
 
-            if(Clients.Keys.Contains(id))
+            SendAcceptConnect(clientEP, clientid, interfaceid);
+            Console.WriteLine("Accept sent");
+            if (Clients.Keys.Contains(clientid))
             {
-                if (!Clients[id].Values.Contains(clientEP))
+                if (!Clients[clientid].Keys.Contains(interfaceid))
                 {
-                    AddClient(clientEP, id);
+                    var list = Clients[clientid];
+
+                    list.Add(interfaceid, clientEP);
                 }
             }
             else
             {
-                AddClient(clientEP, id);
+                var list = new SortedList<int, IPEndPoint>();
+
+                list.Add(interfaceid, clientEP);
+
+                Clients.Add(clientid, list);
+
+                //SendAcceptConnect(clientEP, clientid, interfaceid);
             }
         }
 
-        private void AddClient(IPEndPoint ClientEP, int ClientID)
+        private void SendAcceptConnect(IPEndPoint ClientEP, int ClientID, int InterfaceID)
         {
-            Packet AcceptConnectPacket = new Packet(Packet.Type.AcceptConnect, id, interfaceid);
+            Packet AcceptConnectPacket = new Packet(Packet.Type.AcceptConnect, ClientID, InterfaceID);
 
-            listener.Send(AcceptConnectPacket.Payload, AcceptConnectPacket.Payload.Length, groupEP);
+            listener.Send(AcceptConnectPacket.Payload, AcceptConnectPacket.Payload.Length, ClientEP);
 
             Thread.Sleep(5);
 
-            listener.Send(AcceptConnectPacket.Payload, AcceptConnectPacket.Payload.Length, groupEP);
-
-            var list = new SortedList<int, IPEndPoint>();
-            list.Add(ClientID, ClientEP);
-
-            Clients.Add(ClientID, list);
+            listener.Send(AcceptConnectPacket.Payload, AcceptConnectPacket.Payload.Length, ClientEP);
         }
 
         private async void ProcessDataPacket()
@@ -212,35 +250,42 @@ namespace Server
             //{
                 //if(ProccessBuffer.Count > 0)
                 //{
-                    var bytes = ProccessBuffer.Dequeue();
+            var bytes = ProccessBuffer.Dequeue();
 
-                    var packet = await Packet.Serialize(bytes);
+            var packet = await Packet.Serialize(bytes);
 
-                    if (!Buffer.ContainsKey(packet.SequenceNumber))
-                    {
-                        Buffer.Add(packet.SequenceNumber, packet);
-                    }
+            if (!Buffer.ContainsKey(packet.SequenceNumber))
+            {
+                Buffer.Add(packet.SequenceNumber, packet);
+            }
 
-                    if (Buffer.Count > 1000)
-                    {
-                        Buffer.RemoveAt(0);
-                    }
+            if (Buffer.Count > 10000)
+            {
+                Buffer.RemoveAt(0);
+            }
 
-                    CurrPacket = packet.SequenceNumber;
+            CurrPacket = packet.SequenceNumber;
                     
-                    if (!(CurrPacket == PrevPacket + 1))
-                    {
-                        var diff = CurrPacket - PrevPacket;
+            if(CurrPacket < PrevPacket)
+            {
 
-                        for (uint i = 1; i < diff; i++)
-                        {
-                            LostPackets.Add(PrevPacket + i);
-                            SendARQ();
-                        }
-                    }
+            }
+            else if (!(CurrPacket == PrevPacket + 1))
+            {
+                var diff = CurrPacket - PrevPacket;
 
-                    PrevPacket = CurrPacket;
-                    CurrPacket = 0;
+                for (uint i = 1; i < diff; i++)
+                {
+                    LostPackets.Add(PrevPacket + i);
+                    lost++;
+                    SendARQ();
+                }
+
+                PrevPacket = CurrPacket;
+                CurrPacket = 0;
+            }
+
+            CurrPacket = 0;
                // }
             //}
         }

@@ -1,11 +1,23 @@
 ﻿
+using System;
+
 namespace Server
 {
     class Program
     {
         static void Main(string[] args)
         {
-            new Server(8696);
+            try
+            {
+                new Server(8696);
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+
+                Console.ReadLine();
+            }
         }
     }
 }

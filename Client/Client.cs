@@ -92,7 +92,7 @@ namespace Client
 
             if(LostPacket != null)
             {
-                var PacketToSend = new Packet(Packet.Type.ARQResponse,1 ,1, LostPacket.Data, LostPacket.RTT, LostPacket.SequenceNumber);
+                var PacketToSend = new Packet(Packet.Type.ARQResponse,1 ,1, Packet.Key, LostPacket.Data, LostPacket.RTT, LostPacket.SequenceNumber);
 
                 Send(PacketToSend);
                 Console.WriteLine("QRQ");
