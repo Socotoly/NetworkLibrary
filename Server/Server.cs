@@ -1,10 +1,10 @@
-﻿using System;
+﻿using PacketFactory;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using PacketFactory;
 
 namespace Server
 {
@@ -38,12 +38,9 @@ namespace Server
 
 
 
-            Thread.Sleep(20000);
+            //Thread.Sleep(20000);
 
-            foreach(uint i  in Buffer.Keys)
-            {
-                Console.WriteLine(i);
-            }
+            Console.ReadLine();
             //StartListener(port);
         }
 
@@ -146,15 +143,7 @@ namespace Server
                             break;
                         case Packet.Type.Connect:
                             {
-                                Packet packet = new Packet(Packet.Type.AcceptConnect, id, interfaceid);
-
-                                listener.Send(packet.Payload, packet.Payload.Length, groupEP);
-
-                                Thread.Sleep(5);
-
-                                listener.Send(packet.Payload, packet.Payload.Length, groupEP);
-
-                                AddClient(groupEP);
+                                ProccessConnectPacket(bytes, groupEP);
                             }
                             break;
                         case Packet.Type.AcceptConnect:
@@ -182,15 +171,39 @@ namespace Server
             }
         }
 
-        private void AddClient(IPEndPoint ClientEP)
+        private async void ProccessConnectPacket(byte[] data, IPEndPoint clientEP)
         {
-            if (Clients.Count == 0)
-            {
-                var list = new SortedList<int, IPEndPoint>();
-                list.Add(1, ClientEP);
+            var packet = await Packet.Serialize(data);
 
-                Clients.Add(1, list);
+            var id = packet.ClientID;
+
+            if(Clients.Keys.Contains(id))
+            {
+                if (!Clients[id].Values.Contains(clientEP))
+                {
+                    AddClient(clientEP, id);
+                }
             }
+            else
+            {
+                AddClient(clientEP, id);
+            }
+        }
+
+        private void AddClient(IPEndPoint ClientEP, int ClientID)
+        {
+            Packet AcceptConnectPacket = new Packet(Packet.Type.AcceptConnect, id, interfaceid);
+
+            listener.Send(AcceptConnectPacket.Payload, AcceptConnectPacket.Payload.Length, groupEP);
+
+            Thread.Sleep(5);
+
+            listener.Send(AcceptConnectPacket.Payload, AcceptConnectPacket.Payload.Length, groupEP);
+
+            var list = new SortedList<int, IPEndPoint>();
+            list.Add(ClientID, ClientEP);
+
+            Clients.Add(ClientID, list);
         }
 
         private async void ProcessDataPacket()

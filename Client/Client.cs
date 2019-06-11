@@ -13,6 +13,7 @@ namespace Client
         public int ID;
         public int InterfaceID;
         public uint RTT = 0;
+        public IPEndPoint LocalIPEndPoint;
         private Stopwatch RTTWatcher = new Stopwatch();
         private Stopwatch KeepAliveTimeoutWatcher = new Stopwatch();
         private const int SIO_UDP_CONNRESET = -1744830452;
@@ -24,6 +25,7 @@ namespace Client
         private Queue<Packet> Buffer = new Queue<Packet>();
         private Thread SendThread;
         private SortedList<uint, Packet> SentPackets = new SortedList<uint, Packet>();
+        private NetworkManager NetworkManager;
 
         public Client(IPEndPoint localEP, int ID, int InterfaceID) : base(localEP)
         {
@@ -35,6 +37,7 @@ namespace Client
 
             this.ID = ID;
             this.InterfaceID = InterfaceID;
+            this.LocalIPEndPoint = localEP;
         }
 
         private async void BeginReceiveCycle()
@@ -63,8 +66,9 @@ namespace Client
                             case Packet.Type.Connect:
                                 break;
                             case Packet.Type.AcceptConnect:
-                                Connected = true;
-                                KeepAliveTimeoutWatcher.Restart();
+                                {
+                                    ProcessAcceptConnect();
+                                }
                                 break;
                             case Packet.Type.Rate:
                                 break;
@@ -112,7 +116,7 @@ namespace Client
             {
                 if (Connected && (uint)KeepAliveTimeoutWatcher.ElapsedMilliseconds >= (uint)KeepAliveTimeout)
                 {
-                    Connected = false;
+                    ProccessKeepAliveTimeout();
                 }
                 if (Connected)
                 {
@@ -129,9 +133,17 @@ namespace Client
             
         }
 
-        public new void Connect(IPEndPoint ServerIP)
+        private void ProccessKeepAliveTimeout()
+        {
+            Connected = false;
+
+            this.NetworkManager.ClientDisconnected(InterfaceID);
+        }
+
+        public void Connect(IPEndPoint ServerIP, NetworkManager networkManager)
         {
             ServerEP = ServerIP;
+            NetworkManager = networkManager;
 
             //SendThread = new Thread(TryToSend);
             //SendThread.Start();
@@ -185,43 +197,15 @@ namespace Client
             }
         }
 
-        private bool ProcessAcceptConnect()
+        private void ProcessAcceptConnect()
         {
-            Thread.Sleep(10);
+            if(!Connected)
+            {
+                Connected = true;
 
-            if (Connected)
-            {
-                return true;
-            }
-            else
-            {
-                Thread.Sleep(50);
-            }
-            if (Connected)
-            {
-                return true;
-            }
-            else
-            {
-                Thread.Sleep(100);
-            }
-            if (Connected)
-            {
-                return true;
-            }
-            else
-            {
-                Thread.Sleep(2000);
-            }
-            if (Connected)
-            {
-                return true;
-            }
-            else
-            {
-                //Connected = false;
+                KeepAliveTimeoutWatcher.Restart();
 
-                return false;
+                this.NetworkManager.ClientConnected(this.InterfaceID);
             }
         }
 

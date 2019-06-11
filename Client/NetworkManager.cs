@@ -18,12 +18,12 @@ namespace Client
         private int ClientID;
         private int index = 0;
         private uint SequenceNumber = 0;
+        private const int WheightVal = 10;
+        public bool Connected = false;
 
         public NetworkManager()
         {
-            NetworkInterface[] adapters = NetworkInterface.GetAllNetworkInterfaces();
-
-            GetUsableInterfaces(adapters);
+            GetUsableInterfaces();
 
             InitilaizeClients();
 
@@ -45,7 +45,7 @@ namespace Client
 
             foreach (Client client in Clients.Values)
             {
-                client.Connect(ServerEP);
+                client.Connect(ServerEP, this);
             }
         }
 
@@ -54,8 +54,10 @@ namespace Client
             return new Packet(Packet.Type.Data, client.ID, client.InterfaceID, data, 0, SequenceNumber);
         }
 
-        private void GetUsableInterfaces(NetworkInterface[] adapters)
+        private void GetUsableInterfaces()
         {
+            NetworkInterface[] adapters = NetworkInterface.GetAllNetworkInterfaces();
+
             List<IPAddress> IPList = new List<IPAddress>();
             int i = 1;
             foreach (NetworkInterface adapter in adapters)
@@ -106,25 +108,7 @@ namespace Client
                 Clients.Add(Interface.Key, client);
             }
 
-            var w = 10 / Clients.Count;
-            //var wh = new SortedList<int, int>();
-
-            foreach (KeyValuePair<int, Client> client in Clients)
-            {
-                Wheight.Add(client.Key, w);
-                //wh.Add(client.Key, w);
-            }
-
-            foreach (KeyValuePair<int, int> whe in Wheight )
-            {
-                var c = whe.Value;
-                for(int i = 0; i < c; i++)
-                {
-                    NextClient.Add(whe.Key);
-                }
-            }
-
-            NextClient.Shuffle();
+            
         }
 
         private Client GetNextClient()
@@ -137,10 +121,95 @@ namespace Client
             {
                 index++;
             }
-
+            Console.WriteLine(index);
+            Console.WriteLine(NextClient.Count);
             return Clients[NextClient[index]];
         }
 
+        public void ClientConnected(int InterfaceID)
+        {
+            var wc = Wheight.Count;
+
+            if(wc == 0)
+            {
+                Wheight.Add(InterfaceID, WheightVal);
+            }
+            else if (wc == 1)
+            {
+                Wheight.Add(InterfaceID, WheightVal / 2);
+                Wheight.Values[0] = WheightVal / 2;
+            }
+            else
+            {
+                var val = WheightVal / (wc + 1);
+
+                Wheight.Add(InterfaceID, val);
+
+                for(int i = 0; i < wc; i++)
+                {
+                    Wheight.Values[i] = Wheight.Values[i] / WheightVal * (WheightVal - val);
+                }
+            }
+
+            wc = Wheight.Count;
+
+            for (int i = 0; i < wc; i++)
+            {
+                var val = Wheight.Values[i];
+
+                for (int c = 0; c < val; c++)
+                {
+                    NextClient.Add(Wheight.Keys[i]);
+                }
+            }
+
+            NextClient.Shuffle();
+
+            Connected = true;
+        }
+
+        public void ClientDisconnected(int InterfaceID)
+        {
+            if (Wheight.Keys.Contains(InterfaceID))
+            {
+                var WheightVal = Wheight[InterfaceID];
+
+                Wheight.Remove(InterfaceID);
+
+                var wc = Wheight.Count;
+
+                if (wc == 0)
+                {
+                    Connected = false;
+                }
+                else
+                {
+                    int TotalWheight = 0;
+
+                    for(int i = 0; i < wc; i++)
+                    {
+                        TotalWheight += Wheight.Values[i];
+                    }
+
+                    for (int i = 0; i < wc; i++)
+                    {
+                        Wheight.Values[i] = ((Wheight.Values[i] / (TotalWheight) * 100) / 100) * 10;
+                    }
+
+                    for (int i = 0; i < wc; i++)
+                    {
+                        var val = Wheight.Values[i];
+
+                        for (int c = 0; c < val; c++)
+                        {
+                            NextClient.Add(Wheight.Keys[i]);
+                        }
+                    }
+
+                    NextClient.Shuffle();
+                }
+            }
+        }
         private void PrintInfo()
         {
             foreach (KeyValuePair<int, IPEndPoint> Interface in Interfaces)
