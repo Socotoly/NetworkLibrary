@@ -72,7 +72,7 @@ namespace Client
 
             for (int i = 1; i < 1000; i++)
             {
-                Program.packet = new Packet(Packet.Type.Data,1,1,Packet.Key, Data, client.RTT, (uint)i);
+                Program.packet = new Packet(Packet.Type.Data,1,1,Packet.Key, Data, client.RTT, i);
 
                 client.Send(packet);
 

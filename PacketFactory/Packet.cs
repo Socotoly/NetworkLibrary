@@ -9,16 +9,16 @@ namespace PacketFactory
     {
         public enum Type : byte
         {
-            KeepAlive=0,
-            Data=1,
-            ARQRequest=2,
-            Connect=3,
-            AcceptConnect=4,
-            Rate=5,
-            ARQResponse=6
+            KeepAlive = 0,
+            Data = 1,
+            ARQRequest = 2,
+            Connect = 3,
+            AcceptConnect = 4,
+            Rate = 5,
+            ARQResponse = 6
         }
 
-        public uint SequenceNumber;
+        public int SequenceNumber;
         public uint RTT;
         public byte[] Data;
         public new Type GetType;
@@ -33,9 +33,8 @@ namespace PacketFactory
         private byte[] ClientIDByte = new byte[4];
         private byte[] InterfaceIDByte = new byte[4];
         private byte[] KeyByte = new byte[16];
-        
 
-        public Packet(Type Type, int ClientID, int InterfaceID, string key = Key, byte[] Data = null, uint RTT = 0, uint SequenceNumber = 0)
+        public Packet(Type Type, int ClientID, int InterfaceID, string key = Key, byte[] Data = null, uint RTT = 0, int SequenceNumber = 0)
         {
             GetType = Type;
             GetKey = key;
@@ -94,7 +93,7 @@ namespace PacketFactory
                 case Type.ARQResponse:
                     {
                         Payload = new byte[RTTByte.Length + SequenceNumberByte.Length + Data.Length + TypeByte.Length + ClientIDByte.Length + InterfaceIDByte.Length + KeyByte.Length];
-                        Payload = Combine(TypeByte, ClientIDByte,InterfaceIDByte, KeyByte, SequenceNumberByte, RTTByte, Data);
+                        Payload = Combine(TypeByte, ClientIDByte, InterfaceIDByte, KeyByte, SequenceNumberByte, RTTByte, Data);
                     }
                     break;
             }
@@ -118,7 +117,7 @@ namespace PacketFactory
 
         public async static Task<Packet> Serialize(byte[] Payload)
         {
-            var type = (Type) Payload[0];
+            var type = (Type)Payload[0];
             var clientId = BitConverter.ToInt32(new byte[4] { Payload[2], Payload[3], Payload[4], Payload[5] });
             var interfaceId = BitConverter.ToInt32(new byte[4] { Payload[6], Payload[7], Payload[8], Payload[9] });
             var key = Encoding.Unicode.GetString(new byte[16] { Payload[10], Payload[11], Payload[12], Payload[13], Payload[14], Payload[15], Payload[16], Payload[17], Payload[18], Payload[19], Payload[20], Payload[21], Payload[22], Payload[23], Payload[24], Payload[25] });
@@ -129,7 +128,7 @@ namespace PacketFactory
                     return new Packet(type, clientId, interfaceId, key);
                 case Type.Data:
                     {
-                        var seq = BitConverter.ToUInt32(new byte[4] { Payload[26], Payload[27], Payload[28], Payload[29] });
+                        var seq = BitConverter.ToInt32(new byte[4] { Payload[26], Payload[27], Payload[28], Payload[29] });
                         var rtt = BitConverter.ToUInt16(new byte[2] { Payload[30], Payload[31] });
                         var Data = new byte[Payload.Length - 4 - 2 - 2 - 4 - 4 - 16];
 
@@ -143,7 +142,7 @@ namespace PacketFactory
                     }
                 case Type.ARQRequest:
                     {
-                        var seq = BitConverter.ToUInt32(new byte[4] { Payload[26], Payload[27], Payload[28], Payload[29] });
+                        var seq = BitConverter.ToInt32(new byte[4] { Payload[26], Payload[27], Payload[28], Payload[29] });
 
                         return new Packet(type, clientId, interfaceId, key, null, 0, seq);
                     }
@@ -157,7 +156,7 @@ namespace PacketFactory
                     return new Packet(type, clientId, interfaceId);
                 case Type.ARQResponse:
                     {
-                        var seq = BitConverter.ToUInt32(new byte[4] { Payload[26], Payload[27], Payload[28], Payload[29] });
+                        var seq = BitConverter.ToInt32(new byte[4] { Payload[26], Payload[27], Payload[28], Payload[29] });
                         var rtt = BitConverter.ToUInt16(new byte[2] { Payload[30], Payload[31] });
                         var Data = new byte[Payload.Length - 4 - 2 - 2 - 4 - 4 - 16];
 

@@ -17,7 +17,7 @@ namespace Client
         private List<int> NextClient = new List<int>();
         private int ClientID;
         private int index = 0;
-        private uint SequenceNumber = 0;
+        private int SequenceNumber = 0;
         private const int WheightVal = 10;
         public bool Connected = false;
         public IPEndPoint ServerEP;
@@ -31,7 +31,7 @@ namespace Client
             PrintInfo();
         }
 
-        public void Send(byte[] Data)
+        public async void Send(byte[] Data)
         {
             SequenceNumber++;
 
@@ -39,7 +39,7 @@ namespace Client
 
             var packet = GetPacket(Data, client);
 
-            client.Send(packet);
+            await client.Send(packet);
         }
 
         public void Connect(string ServerIP, int ServerPort)
@@ -54,7 +54,7 @@ namespace Client
 
         private Packet GetPacket(byte[] data, Client client)
         {
-            return new Packet(Packet.Type.Data, client.ID, client.InterfaceID,Packet.Key, data, 0, SequenceNumber);
+            return new Packet(Packet.Type.Data, client.ID, client.InterfaceID, Packet.Key, data, 0, SequenceNumber);
         }
 
         private void GetUsableInterfaces()
@@ -110,13 +110,11 @@ namespace Client
 
                 Clients.Add(Interface.Key, client);
             }
-
-            
         }
 
         private Client GetNextClient()
         {
-            if(index == NextClient.Count - 1)
+            if (index == NextClient.Count - 1)
             {
                 index = 0;
             }
@@ -132,7 +130,7 @@ namespace Client
         {
             var wc = Wheight.Count;
 
-            if(wc == 0)
+            if (wc == 0)
             {
                 Wheight.Add(InterfaceID, WheightVal);
             }
@@ -148,7 +146,7 @@ namespace Client
 
                 Wheight.Add(InterfaceID, val);
 
-                for(int i = 0; i < wc; i++)
+                for (int i = 0; i < wc; i++)
                 {
                     var key = Wheight.Keys[i];
 
@@ -191,7 +189,7 @@ namespace Client
                 {
                     int TotalWheight = 0;
 
-                    for(int i = 0; i < wc; i++)
+                    for (int i = 0; i < wc; i++)
                     {
                         TotalWheight += Wheight.Values[i];
                     }
@@ -235,7 +233,7 @@ namespace Client
             {
                 var c = GetNextClient();
 
-                Console.WriteLine("Next client is: "+c.Client.LocalEndPoint.ToString());
+                Console.WriteLine("Next client is: " + c.Client.LocalEndPoint.ToString());
             }
             Console.WriteLine("-------------------------------");
 
@@ -270,6 +268,5 @@ namespace Client
                 list[n] = value;
             }
         }
-
     }
 }

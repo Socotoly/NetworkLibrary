@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using PacketFactory;
 
 namespace Client
@@ -24,7 +25,7 @@ namespace Client
         private uint sleepAfterSend = 2;
         private Queue<Packet> Buffer = new Queue<Packet>();
         private Thread SendThread;
-        private SortedList<uint, Packet> SentPackets = new SortedList<uint, Packet>();
+        private SortedList<int, Packet> SentPackets = new SortedList<int, Packet>();
         private NetworkManager NetworkManager;
 
         public Client(IPEndPoint localEP, int ID, int InterfaceID) : base(localEP)
@@ -42,7 +43,7 @@ namespace Client
 
         private async void BeginReceiveCycle()
         {
-            while(true)
+            while (true)
             {
                 try
                 {
@@ -90,14 +91,14 @@ namespace Client
             Packet LostPacket;
             SentPackets.TryGetValue(ARQPacket.SequenceNumber, out LostPacket);
 
-            if(LostPacket != null)
+            if (LostPacket != null)
             {
-                var PacketToSend = new Packet(Packet.Type.ARQResponse,1 ,1, Packet.Key, LostPacket.Data, LostPacket.RTT, LostPacket.SequenceNumber);
+                var PacketToSend = new Packet(Packet.Type.ARQResponse, ID, InterfaceID, Packet.Key, LostPacket.Data, LostPacket.RTT, LostPacket.SequenceNumber);
 
-                Send(PacketToSend);
+                await Send(PacketToSend);
                 Console.WriteLine("QRQ");
             }
-            
+
             //SentPackets.Remove(ARQPacket.SequenceNumber);
         }
 
@@ -109,8 +110,8 @@ namespace Client
 
             RTTWatcher.Reset();
         }
-        
-        public void KeepAliveAsync()
+
+        public async void KeepAliveAsync()
         {
             while (true)
             {
@@ -120,17 +121,17 @@ namespace Client
                 }
                 if (Connected)
                 {
-                    var packet = new Packet(Packet.Type.KeepAlive,1,1);
+                    var packet = new Packet(Packet.Type.KeepAlive, 1, 1);
 
                     RTTWatcher.Start();
 
-                    Send(packet);
+                    await Send(packet);
                 }
 
                 Thread.Sleep(1500);
                 //NOP(1.5);
             }
-            
+
         }
 
         private void ProccessKeepAliveTimeout()
@@ -170,14 +171,15 @@ namespace Client
             }
         }
 
-        private void TryToConnect()
+        private async void TryToConnect()
         {
-            while (true) {
+            while (true)
+            {
                 if (!Connected)
                 {
                     Console.WriteLine("Trying to Connect");
 
-                    Send(new Packet(Packet.Type.Connect,1,1));
+                    await Send(new Packet(Packet.Type.Connect, 1, 1));
 
                     Thread.Sleep(20);
 
@@ -199,7 +201,7 @@ namespace Client
 
         private void ProcessAcceptConnect()
         {
-            if(!Connected)
+            if (!Connected)
             {
                 Connected = true;
 
@@ -232,9 +234,9 @@ namespace Client
 
         public IPEndPoint ServerEP { get; private set; }
 
-        public void Send(Packet Packet)
+        public async Task Send(Packet Packet)
         {
-            base.SendAsync(Packet.Payload, Packet.Payload.Length, ServerEP);
+            await SendAsync(Packet.Payload, Packet.Payload.Length, ServerEP);
 
             if (Packet.GetType == Packet.Type.Data)
             {
@@ -251,7 +253,7 @@ namespace Client
         {
             while (true)
             {
-                if(Buffer.Count != 0)
+                if (Buffer.Count != 0)
                 {
                     var Packet = Buffer.Dequeue();
 

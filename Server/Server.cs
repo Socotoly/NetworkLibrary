@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -20,11 +21,12 @@ namespace Server
         private uint Rate8s = 0;
         private Stopwatch WatchRate1s = new Stopwatch();
         private Stopwatch WatchRate8s = new Stopwatch();
-        private SortedList<uint, Packet> Buffer = new SortedList<uint, Packet>();
+        private SortedList<int, Packet> Buffer = new SortedList<int, Packet>();
         public uint ARQDelay = 1000;
-        private uint PrevPacket = 0;
-        private uint CurrPacket = 0;
-        private List<uint> LostPackets = new List<uint>();
+        private int PrevPacket = 0;
+        private int CurrPacket = 0;
+        private List<int> LostPackets = new List<int>();
+        private List<int> SentLostPackets = new List<int>();
         private Queue<byte[]> ProccessBuffer = new Queue<byte[]>();
         private SortedList<int, SortedList<int, IPEndPoint>> Clients = new SortedList<int, SortedList<int, IPEndPoint>>();
         private int lost = 0;
@@ -39,16 +41,16 @@ namespace Server
             new Thread(StartListener).Start();
             //new Thread(ProcessDataPacket).Start();
 
+            new Thread(ARQThread).Start();
 
-
-            while(Buffer.Count == 0)
+            while (Buffer.Count == 0)
             {
 
             }
             Thread.Sleep(20000);
 
-            Console.WriteLine("Lost packets: "+ lost);
-            Console.WriteLine("Total packets: "+ Buffer.Count);
+            Console.WriteLine("Lost packets: " + lost);
+            Console.WriteLine("Total packets: " + Buffer.Count);
 
 
             Console.ReadLine();
@@ -60,36 +62,72 @@ namespace Server
             listener.Close();
         }
 
-        private async void SendARQ()
+        private void ARQThread()
         {
-            //while (true)
-            //{
-                //if(LostPackets.Count > 0)
-                //{
-                    //LostPackets.Sort();
-                    
-                    var packet = new Packet(Packet.Type.ARQRequest, id, interfaceid, Packet.Key, null, 0, LostPackets[0]);
-
-                    if (! groupEP.Equals(null))
-                    {
-                        listener.Send(packet.Payload, packet.Payload.Length, groupEP);
-                    }
-
-                    LostPackets.Remove(LostPackets[0]);
-
-                    //LostPackets.Sort();
-                //}
-            //}
+            SendARQ();
         }
 
-        private void CalculateDataRate() {
-            while (true) {
-                if (DataPackets > 0) {
-                    if (!WatchRate1s.IsRunning) {
+        private async void SendARQ()
+        {
+            try
+            {
+                if (Buffer.Count > 0)
+                {
+                    IList<int> keys;
+
+                    lock (Buffer)
+                    {
+                        keys = Buffer.Keys;
+                    }
+
+                    var k = new List<int>();
+                    k.AddRange(keys);
+
+                    var list = Enumerable.Range(k.First(), k.Last()).Except(keys);
+
+                    var l = list.ToList();
+
+                    for (int i = 0; i < l.Count(); i++)
+                    {
+                        var packet = new Packet(Packet.Type.ARQRequest, id, interfaceid, Packet.Key, null, 0, l[i]);
+
+                        if (!groupEP.Equals(null))
+                        {
+                            await listener.SendAsync(packet.Payload, packet.Payload.Length, groupEP);
+
+                            Thread.Sleep(5);
+
+                            await listener.SendAsync(packet.Payload, packet.Payload.Length, groupEP);
+
+                            SentLostPackets.Add(l[i]);
+                        }
+                    }
+                }
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+
+            Thread.Sleep(250);
+
+            SendARQ();
+        }
+
+        private void CalculateDataRate()
+        {
+            while (true)
+            {
+                if (DataPackets > 0)
+                {
+                    if (!WatchRate1s.IsRunning)
+                    {
                         WatchRate1s.Start();
                         //WatchRate8s.Start();
                     }
-                    if (WatchRate1s.ElapsedMilliseconds > 5000) {
+                    if (WatchRate1s.ElapsedMilliseconds > 5000)
+                    {
                         var rate1s = Rate1s / 5;
                         Console.WriteLine(WatchRate1s.ElapsedMilliseconds);
                         Console.WriteLine(rate1s);
@@ -102,7 +140,7 @@ namespace Server
 
                         var data = new byte[] { 1, RateByte[0], RateByte[1] };
 
-                        var packet = new Packet(Packet.Type.Rate, id, interfaceid,Packet.Key, data);
+                        var packet = new Packet(Packet.Type.Rate, id, interfaceid, Packet.Key, data);
 
                         listener.Send(packet.Payload, packet.Payload.Length, groupEP);
 
@@ -112,17 +150,19 @@ namespace Server
             }
         }
 
-        private void StartListener()
+        private async void StartListener()
         {
             try
             {
                 while (true)
                 {
-                    byte[] bytes = listener.Receive(ref groupEP);
+                    var task = await listener.ReceiveAsync();
+                    byte[] bytes = task.Buffer;
 
+                    var RemoteEP = task.RemoteEndPoint;
                     //var passkey = bytes[];
 
-                    if (! Authenticated(bytes))
+                    if (!Authenticated(bytes))
                     {
                         continue;
                     }
@@ -135,7 +175,7 @@ namespace Server
                             {
                                 var packet = new Packet(Packet.Type.KeepAlive, id, interfaceid);
 
-                                listener.Send(packet.Payload, packet.Payload.Length, groupEP);
+                                listener.Send(packet.Payload, packet.Payload.Length, RemoteEP);
                             }
                             break;
                         case Packet.Type.Data:
@@ -161,7 +201,7 @@ namespace Server
                             break;
                         case Packet.Type.Connect:
                             {
-                                ProccessConnectPacket(bytes, groupEP);
+                                ProccessConnectPacket(bytes, RemoteEP);
                             }
                             break;
                         case Packet.Type.AcceptConnect:
@@ -170,9 +210,7 @@ namespace Server
                             break;
                         case Packet.Type.ARQResponse:
                             {
-                                var task = Packet.Serialize(bytes);
-                                task.Wait();
-                                var packet = task.Result;
+                                var packet = await Packet.Serialize(bytes);
 
                                 if (!Buffer.ContainsKey(packet.SequenceNumber))
                                 {
@@ -191,7 +229,7 @@ namespace Server
 
         private bool Authenticated(byte[] bytes)
         {
-            if(bytes.Length >= 26)
+            if (bytes.Length >= 26)
             {
                 var key = Encoding.Unicode.GetString(new byte[16] { bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15], bytes[16], bytes[17], bytes[18], bytes[19], bytes[20], bytes[21], bytes[22], bytes[23], bytes[24], bytes[25] });
 
@@ -233,23 +271,19 @@ namespace Server
             }
         }
 
-        private void SendAcceptConnect(IPEndPoint ClientEP, int ClientID, int InterfaceID)
+        private async void SendAcceptConnect(IPEndPoint ClientEP, int ClientID, int InterfaceID)
         {
             Packet AcceptConnectPacket = new Packet(Packet.Type.AcceptConnect, ClientID, InterfaceID);
 
-            listener.Send(AcceptConnectPacket.Payload, AcceptConnectPacket.Payload.Length, ClientEP);
+            await listener.SendAsync(AcceptConnectPacket.Payload, AcceptConnectPacket.Payload.Length, ClientEP);
 
             Thread.Sleep(5);
 
-            listener.Send(AcceptConnectPacket.Payload, AcceptConnectPacket.Payload.Length, ClientEP);
+            await listener.SendAsync(AcceptConnectPacket.Payload, AcceptConnectPacket.Payload.Length, ClientEP);
         }
 
         private async void ProcessDataPacket()
         {
-            //while (true)
-            //{
-                //if(ProccessBuffer.Count > 0)
-                //{
             var bytes = ProccessBuffer.Dequeue();
 
             var packet = await Packet.Serialize(bytes);
@@ -265,29 +299,28 @@ namespace Server
             }
 
             CurrPacket = packet.SequenceNumber;
-                    
-            if(CurrPacket < PrevPacket)
+
+            if (CurrPacket < PrevPacket)
             {
 
             }
-            else if (!(CurrPacket == PrevPacket + 1))
+            else
             {
-                var diff = CurrPacket - PrevPacket;
-
-                for (uint i = 1; i < diff; i++)
+                if (!(CurrPacket == PrevPacket + 1))
                 {
-                    LostPackets.Add(PrevPacket + i);
-                    lost++;
-                    SendARQ();
-                }
+                    var diff = CurrPacket - PrevPacket;
 
-                PrevPacket = CurrPacket;
-                CurrPacket = 0;
+                    for (int i = 1; i < diff; i++)
+                    {
+                        LostPackets.Add(PrevPacket + i);
+                        lost++;
+                    }
+
+                    PrevPacket = CurrPacket;
+                }
             }
 
             CurrPacket = 0;
-               // }
-            //}
         }
 
         public static void RewriteLine(int lineNumber, String newText)
@@ -302,7 +335,7 @@ namespace Server
         {
             while (true)
             {
-                if(LostPackets.Count > 0)
+                if (LostPackets.Count > 0)
                 {
                     for (int x = LostPackets.Count - 1; x > -1; x--)
                     {
@@ -315,7 +348,35 @@ namespace Server
             }
         }
 
+        /// <summary>
+        /// <para>For two sorted IEnumerable&lt;T&gt; (superset and subset),</para>
+        /// <para>returns the values in superset which are not in subset.</para>
+        /// </summary>
+        public static IEnumerable<T> CompareSortedEnumerables<T>(IEnumerable<T> superset, IEnumerable<T> subset)
+            where T : IComparable
+        {
+            IEnumerator<T> supersetEnumerator = superset.GetEnumerator();
+            IEnumerator<T> subsetEnumerator = subset.GetEnumerator();
+            bool itemsRemainingInSubset = subsetEnumerator.MoveNext();
+
+            // handle the case when the first item in subset is less than the first item in superset
+            T firstInSuperset = superset.First();
+            while (itemsRemainingInSubset && supersetEnumerator.Current.CompareTo(subsetEnumerator.Current) >= 0)
+                itemsRemainingInSubset = subsetEnumerator.MoveNext();
+
+            while (supersetEnumerator.MoveNext())
+            {
+                int comparison = supersetEnumerator.Current.CompareTo(subsetEnumerator.Current);
+                if (!itemsRemainingInSubset || comparison < 0)
+                {
+                    yield return supersetEnumerator.Current;
+                }
+                else if (comparison >= 0)
+                {
+                    while (itemsRemainingInSubset && supersetEnumerator.Current.CompareTo(subsetEnumerator.Current) >= 0)
+                        itemsRemainingInSubset = subsetEnumerator.MoveNext();
+                }
+            }
+        }
     }
-
-
 }

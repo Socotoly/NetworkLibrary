@@ -9,7 +9,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Server", "Server\Server.csp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TcpServer", "TcpServer\TcpServer.csproj", "{E7EDAD1A-7D17-48E4-8309-EB57F1DE2E2F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PacketFactory", "PacketFactory\PacketFactory.csproj", "{9EBA4144-44FA-4D73-9A59-5B4E06A4A3A2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PacketFactory", "PacketFactory\PacketFactory.csproj", "{9EBA4144-44FA-4D73-9A59-5B4E06A4A3A2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReedSolomon", "ReedSolomon\ReedSolomon.csproj", "{A421DF21-55C7-4339-9CF9-2F2444E4767C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{9EBA4144-44FA-4D73-9A59-5B4E06A4A3A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9EBA4144-44FA-4D73-9A59-5B4E06A4A3A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9EBA4144-44FA-4D73-9A59-5B4E06A4A3A2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A421DF21-55C7-4339-9CF9-2F2444E4767C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A421DF21-55C7-4339-9CF9-2F2444E4767C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A421DF21-55C7-4339-9CF9-2F2444E4767C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A421DF21-55C7-4339-9CF9-2F2444E4767C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
